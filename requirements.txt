@@ -1,0 +1,10 @@
+pandas
+numpy
+beautifulsoup4
+requests
+requests-html
+lxml
+lxml_html_clean
+selenium
+openai
+python-dotenv
