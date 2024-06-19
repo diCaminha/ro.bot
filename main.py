@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 
 import pandas as pd
 import os
+import argparse
 
 # Defina sua chave de API
 load_dotenv()
@@ -21,6 +22,13 @@ client = OpenAI(api_key=api_key)
 
 if __name__ == '__main__':
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--texto', type=str, help='texto processado')
+
+    args = parser.parse_args()
+
+    texto = args.texto
+    print(f"texto enviado foi: {texto}")
     col_teses = []
 
     service = Service('/opt/homebrew/bin/chromedriver')
@@ -42,7 +50,7 @@ if __name__ == '__main__':
 
         # Limpar o campo de input e adicionar o texto desejado
         input_field.clear()
-        input_field.send_keys('roubo qualificado')
+        input_field.send_keys(texto)
 
         # Encontrar o botão pelo ID
         submit_button = driver.find_element(By.ID, 'frmJuris:formConsultaJuris:btPesquisar')
