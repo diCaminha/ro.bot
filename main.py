@@ -1,6 +1,5 @@
 import json
-import os.path
-
+import os
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -10,10 +9,31 @@ from selenium.webdriver.support import expected_conditions as EC
 import pandas as pd
 from openai import OpenAI
 from dotenv import load_dotenv
-
-import pandas as pd
-import os
+import base64
+import numpy as np
 import argparse
+
+from elasticsearch import Elasticsearch, helpers
+
+# 3. Elasticsearch setup
+es = Elasticsearch([{'host': 'localhost', 'port': 9200, 'scheme': 'http'}])
+index_name = 'teses'
+
+mapping = {
+    'mappings': {
+        'properties': {
+            'tese': {'type': 'text'},
+            'acolhida': {'type': 'boolean'},
+            'justificativa': {'type': 'text'},
+            'infoadd': {'type': 'text'},
+            'resumo': {'type': 'text'},
+            'embedding': {'type': 'binary'}
+        }
+    }
+}
+
+if not es.indices.exists(index=index_name):
+    es.indices.create(index=index_name, body=mapping)
 
 # Defina sua chave de API
 load_dotenv()
@@ -130,6 +150,46 @@ if __name__ == '__main__':
                 resposta_json = json.loads(resposta)
 
                 teses = resposta_json["teses"]
+
+                # 4. Generate Embeddings and Index in Elasticsearch
+                actions = []
+                doc_ids = []
+                doc_embeddings = []
+
+                for tese in teses:
+                    # Combine text for embedding
+                    content = tese['tese'] + ' ' + tese['resumo']
+
+                    # Generate OpenAI embedding
+                    embedding = client.embeddings.create(
+                        input=content,
+                        model="text-embedding-ada-002"  # Choose OpenAI embedding model
+                    ).data[0].embedding
+
+                    # Encode the embedding as base64
+                    embedding_b64 = base64.b64encode(np.array(embedding).astype(np.float32).tobytes()).decode('utf-8')
+
+                    # Create document for indexing
+                    doc = {
+                        'tese': tese['tese'],
+                        'acolhida': tese['acolhida'],
+                        'justificativa': tese['justificativa'],
+                        'infoadd': tese['infoadd'],
+                        'resumo': tese['resumo'],
+                        'embedding': embedding_b64  # Add embedding
+                    }
+                    actions.append({
+                        '_index': index_name,
+                        '_source': doc
+                    })
+
+                    doc_ids.append(index)
+                    doc_embeddings.append(embedding)
+
+                # Index in Elasticsearch
+                helpers.bulk(es, actions)
+
+
 
                 col_teses.extend(teses)
 

@@ -8,3 +8,5 @@ lxml_html_clean
 selenium
 openai
 python-dotenv
+elasticsearch
+sentence-transformers
