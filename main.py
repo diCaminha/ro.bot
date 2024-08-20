@@ -23,11 +23,18 @@ mapping = {
     'mappings': {
         'properties': {
             'tese': {'type': 'text'},
+            'numero_processo': {'type': 'text'},
+            'nome_relator': {'type': 'text'},
+            'data_julgamento': {'type': 'text'},
             'acolhida': {'type': 'boolean'},
             'justificativa': {'type': 'text'},
-            'infoadd': {'type': 'text'},
             'resumo': {'type': 'text'},
-            'embedding': {'type': 'binary'}
+            'palavras_chave': {
+                'type': 'text',
+                'fields': {
+                    'keyword': {'type': 'keyword'}
+                }
+            }
         }
     }
 }
@@ -123,24 +130,26 @@ if __name__ == '__main__':
                                      direito e teses jurídicas. Analise todas as nuances do julgado a seguir e traga de forma detalhada 
                                      as teses da defesa, se foi acolhida ou não e a justificativa com base na decisão analisada. 
                                      faça um objeto json com assunto do caso, teses da defesa, se foi acolhida ou não, justificativa, 
-                                     informações adicionais, resumo do caso. No formato:
-
+                                     numero do processo, nome do relator, data do julgamento, resumo do caso. Tambem quero que voce
+                                     gere um campo chamado palavras_chave, onde voce vai sintetizar todo o conteudo da tese em questão em 5 keywords
+                                     que mais resumam essa tese, para que no futuro eu possa pesquisar por essas keywords e trazer essa tese.
+                                     
+                                     Eu quero que o retorno seja EXATAMENTE do Formato do json abaixo. Eu não quero nenhum outro texto além do formato json abaixo:
+                                     
+                                    Exemplo de resposta que espero: 
                                     {"teses": [
                                         {
                                         "tese": "TESE_AQUI",
+                                        "numero_processo": "NUMERO DO PROCESSO AQUI",
+                                        "nome_relator": "COLOCAR NOME DO RELATOR AQUI",
+                                        "data_julgamento": "COLOCAR DATA DO JULGAMENTO DA TESE",
                                         "acolhida": true/false,
                                         "justificativa": "JUSTIFICATIVA",
-                                        "infoadd": "INFO_ADICIONAL_AQUI",
-                                        "resumo": "RESUMO_AQUI"
-                                        },
-                                        {
-                                        "tese": "TESE_AQUI",
-                                        "acolhida": true/false,
-                                        "justificativa": "JUSTIFICATIVA",
-                                        "infoadd": "INFO_ADICIONAL_AQUI",
-                                        "resumo": "RESUMO_AQUI"
+                                        "resumo": "RESUMO_AQUI",
+                                        "palavras_chave": ["UMA KEYWORD", "DUAS KEYWORDS", "TRES KEYWORDS", "QUATRO KEYWORD", "CINCO KEYWORD"]
                                         }
                                     ]
+                                    
                                      """},
                         {"role": "user", "content": texto}
                     ]
@@ -151,32 +160,22 @@ if __name__ == '__main__':
 
                 teses = resposta_json["teses"]
 
-                # 4. Generate Embeddings and Index in Elasticsearch
                 actions = []
                 doc_ids = []
                 doc_embeddings = []
 
                 for tese in teses:
-                    # Combine text for embedding
-                    content = tese['tese'] + ' ' + tese['resumo']
 
-                    # Generate OpenAI embedding
-                    embedding = client.embeddings.create(
-                        input=content,
-                        model="text-embedding-ada-002"  # Choose OpenAI embedding model
-                    ).data[0].embedding
-
-                    # Encode the embedding as base64
-                    embedding_b64 = base64.b64encode(np.array(embedding).astype(np.float32).tobytes()).decode('utf-8')
-
-                    # Create document for indexing
+                    # Create document for indexing`
                     doc = {
                         'tese': tese['tese'],
                         'acolhida': tese['acolhida'],
                         'justificativa': tese['justificativa'],
-                        'infoadd': tese['infoadd'],
                         'resumo': tese['resumo'],
-                        'embedding': embedding_b64  # Add embedding
+                        'numero_processo': tese['numero_processo'],
+                        'nome_relator': tese['nome_relator'],
+                        'data_julgamento': tese['data_julgamento'],
+                        'palavras_chave': tese['palavras_chave']
                     }
                     actions.append({
                         '_index': index_name,
@@ -184,7 +183,6 @@ if __name__ == '__main__':
                     })
 
                     doc_ids.append(index)
-                    doc_embeddings.append(embedding)
 
                 # Index in Elasticsearch
                 helpers.bulk(es, actions)
